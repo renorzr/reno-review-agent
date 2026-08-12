@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import reno_review_agent as agent
+import review_agent as agent
 
 BASE_SHA = "1" * 40
 HEAD_SHA = "2" * 40
@@ -244,8 +244,8 @@ class CommandRunnerTests(unittest.TestCase):
             any("test pass still running" in line for line in captured.output)
         )
 
-    @mock.patch("reno_review_agent.time.sleep")
-    @mock.patch("reno_review_agent.subprocess.run")
+    @mock.patch("review_agent.core.time.sleep")
+    @mock.patch("review_agent.core.subprocess.run")
     def test_git_fetch_retries_transient_network_failure(self, run, sleep) -> None:
         failure = subprocess.CalledProcessError(
             128,
@@ -265,8 +265,8 @@ class CommandRunnerTests(unittest.TestCase):
         sleep.assert_called_once_with(5)
         self.assertEqual(run.call_args.kwargs["timeout"], 60)
 
-    @mock.patch("reno_review_agent.time.sleep")
-    @mock.patch("reno_review_agent.subprocess.run")
+    @mock.patch("review_agent.core.time.sleep")
+    @mock.patch("review_agent.core.subprocess.run")
     def test_network_failure_after_three_attempts_is_typed(self, run, sleep) -> None:
         run.side_effect = subprocess.CalledProcessError(
             128,
@@ -280,8 +280,8 @@ class CommandRunnerTests(unittest.TestCase):
         self.assertEqual(run.call_count, 3)
         self.assertEqual([call.args[0] for call in sleep.call_args_list], [5, 15])
 
-    @mock.patch("reno_review_agent.time.sleep")
-    @mock.patch("reno_review_agent.subprocess.run")
+    @mock.patch("review_agent.core.time.sleep")
+    @mock.patch("review_agent.core.subprocess.run")
     def test_github_write_is_not_blindly_retried(self, run, sleep) -> None:
         run.side_effect = subprocess.CalledProcessError(
             1,
@@ -570,7 +570,7 @@ class SweepResultTests(unittest.TestCase):
         self.assertEqual(result.verdict, "approved")
         self.assertIsNone(result.review_body)
 
-    @mock.patch("reno_review_agent._invoke_codex_sweep")
+    @mock.patch("review_agent.reviews._invoke_codex_sweep")
     def test_product_review_with_blocker_finishes_in_one_pass(self, invoke) -> None:
         invoke.return_value = validated_sweep(findings=[finding_payload()])
 
@@ -592,7 +592,7 @@ class SweepResultTests(unittest.TestCase):
         self.assertEqual(result.sweep["passes"], 1)
         self.assertEqual(result.sweep["strategy"], "product_review")
 
-    @mock.patch("reno_review_agent._invoke_codex_sweep")
+    @mock.patch("review_agent.reviews._invoke_codex_sweep")
     def test_clean_product_review_approves_after_one_pass(self, invoke) -> None:
         invoke.return_value = validated_sweep()
         result = agent._run_product_review(
@@ -613,7 +613,7 @@ class SweepResultTests(unittest.TestCase):
         self.assertEqual(result.sweep["passes"], 1)
         self.assertEqual(result.sweep["strategy"], "product_review")
 
-    @mock.patch("reno_review_agent._invoke_codex_sweep")
+    @mock.patch("review_agent.reviews._invoke_codex_sweep")
     def test_nonblocking_finding_does_not_block_approval(self, invoke) -> None:
         invoke.return_value = validated_sweep(
             findings=[finding_payload(blocking=False)]
@@ -635,7 +635,7 @@ class SweepResultTests(unittest.TestCase):
         self.assertIn("Unbounded request", result.review_body)
         self.assertEqual(invoke.call_count, 1)
 
-    @mock.patch("reno_review_agent._invoke_codex_sweep")
+    @mock.patch("review_agent.reviews._invoke_codex_sweep")
     def test_issue_finishes_after_one_bounded_pass(self, invoke) -> None:
         first = validated_sweep(
             findings=[finding_payload(title="Primary contract gap")],
@@ -764,7 +764,10 @@ class ReviewPresentationTests(unittest.TestCase):
 
     def test_prerequisites_check_github_and_codex_for_live_runs(self) -> None:
         config = agent.parse_args(
-            ["--org", "example-org", "--session-id", "session-123"]
+            [
+                "--org", "example-org", "--session-id", "session-123",
+                "--gh-bin", "test-gh", "--codex-bin", "test-codex",
+            ]
         )
         runner = FakeRunner([])
         agent.verify_prerequisites(config, runner)
@@ -772,10 +775,10 @@ class ReviewPresentationTests(unittest.TestCase):
             runner.calls,
             [
                 ["git", "--version"],
-                ["gh", "--version"],
-                ["gh", "auth", "status"],
-                ["codex", "--version"],
-                ["codex", "login", "status"],
+                ["test-gh", "--version"],
+                ["test-gh", "auth", "status"],
+                ["test-codex", "--version"],
+                ["test-codex", "login", "status"],
             ],
         )
 

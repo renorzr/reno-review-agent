@@ -6,6 +6,8 @@
 
 组织、仓库范围、触发提及、审查机器人名称、Issue 代码分支、目录、超时、会话和 Codex 沙箱行为均通过 `.env` 或命令行参数配置。
 
+实现采用 Python 包结构：`core` 负责命令执行和通用工具，`github` 负责 GitHub 发现与数据校验，`storage` 管理状态和 worktree，`reviews` 运行并校验 Codex 评审，`app` 包含配置和轮询循环。原有的 `reno_review_agent.py` 保留为兼容启动入口；新集成可使用 `python -m review_agent`。
+
 ## 推荐开发模式
 
 建议在开发期间持续运行 Agent，并将轮询周期设为五分钟：

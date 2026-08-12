@@ -6,6 +6,8 @@ This is a GitHub Issue and pull request review agent. It polls the selected repo
 
 The organization, repository scope, mention, review identity, Issue code branch, directories, timeouts, session, and Codex sandbox behavior are configured through `.env` or command-line options.
 
+The implementation is organized as a Python package: `core` handles command execution and shared utilities, `github` discovers and validates GitHub data, `storage` manages state and worktrees, `reviews` runs and validates Codex reviews, and `app` contains configuration and the polling loop. The existing `reno_review_agent.py` remains a compatibility launcher; new integrations can use `python -m review_agent`.
+
 ## Recommended development workflow
 
 Run the agent continuously during development, with a five-minute polling interval:
