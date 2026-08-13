@@ -55,7 +55,14 @@ def fetch_pull_request(
         pull_request.repo_full_name, repositories
     ):
         return None
-    return pull_request
+    if pull_request is None:
+        return None
+    return dataclasses.replace(
+        pull_request,
+        base_sha=fetch_pull_request_base_sha(
+            runner, gh_bin=gh_bin, pull_request=pull_request
+        ),
+    )
 
 
 def render_review_comment(

@@ -74,6 +74,32 @@ def parse_pull_request(
     )
 
 
+def fetch_pull_request_base_sha(
+    runner: CommandRunner,
+    *,
+    gh_bin: str,
+    pull_request: PullRequest,
+) -> str:
+    """Return the live base-branch tip, not the possibly stale PR API base SHA."""
+    reference_payload = runner.json(
+        [
+            gh_bin,
+            "api",
+            f"repos/{pull_request.repo_full_name}/git/ref/heads/{pull_request.base_ref}",
+        ]
+    )
+    if not isinstance(reference_payload, dict):
+        raise AgentError(
+            f"GitHub returned invalid base branch metadata for {pull_request.key}"
+        )
+    try:
+        return _validate_sha(reference_payload["object"]["sha"], "base SHA")
+    except (KeyError, TypeError) as exc:
+        raise AgentError(
+            f"GitHub returned incomplete base branch metadata for {pull_request.key}"
+        ) from exc
+
+
 def discover_pull_requests(
     runner: CommandRunner,
     *,
@@ -129,7 +155,14 @@ def discover_pull_requests(
             )
         pull_request = parse_pull_request(payload, org, mention)
         if pull_request is not None:
-            pull_requests.append(pull_request)
+            pull_requests.append(
+                dataclasses.replace(
+                    pull_request,
+                    base_sha=fetch_pull_request_base_sha(
+                        runner, gh_bin=gh_bin, pull_request=pull_request
+                    ),
+                )
+            )
     return pull_requests
 
 

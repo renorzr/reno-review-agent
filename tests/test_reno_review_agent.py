@@ -345,6 +345,7 @@ class PullRequestTests(unittest.TestCase):
                     ]
                 },
                 github_payload(),
+                {"ref": "refs/heads/main", "object": {"sha": BASE_SHA}},
             ]
         )
         results = agent.discover_pull_requests(
@@ -352,6 +353,30 @@ class PullRequestTests(unittest.TestCase):
         )
         self.assertEqual([item.key for item in results], ["0xLazAI/example#7"])
         self.assertIn("repos/0xLazAI/example/pulls/7", runner.calls[1])
+
+    def test_discovery_uses_live_base_branch_sha(self) -> None:
+        live_base_sha = "3" * 40
+        runner = FakeRunner(
+            [
+                {
+                    "items": [
+                        {
+                            "repository_url": "https://api.github.com/repos/0xLazAI/example",
+                            "number": 7,
+                        }
+                    ]
+                },
+                github_payload(),
+                {"ref": "refs/heads/main", "object": {"sha": live_base_sha}},
+            ]
+        )
+
+        results = agent.discover_pull_requests(
+            runner, gh_bin="gh", org="0xLazAI", mention="@RenoReviewAgent"
+        )
+
+        self.assertEqual(results[0].base_sha, live_base_sha)
+        self.assertTrue(any("git/ref/heads/main" in part for part in runner.calls[2]))
 
 
 class IssueTests(unittest.TestCase):
@@ -843,6 +868,7 @@ class DryRunTests(unittest.TestCase):
                         ]
                     },
                     github_payload(),
+                    {"ref": "refs/heads/main", "object": {"sha": BASE_SHA}},
                     {"items": []},
                 ]
             )
