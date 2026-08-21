@@ -18,6 +18,7 @@ from .models import (
 from .reviews import (
     build_codex_command, build_issue_review_prompt, build_review_prompt,
     changed_files_for_pull_request, synthesize_review_result, validate_sweep_result,
+    with_pull_request_merge_base,
 )
 from .core import _safe_network_operation
 from .reviews import _invoke_codex_sweep, _run_issue_contract_review, _run_product_review
@@ -33,5 +34,5 @@ __all__ = [
     "normalize_repositories", "parse_args", "parse_issue", "parse_pull_request",
     "process_cycle", "record_issue_review", "record_review", "render_issue_review_comment",
     "render_review_comment", "synthesize_review_result", "validate_sweep_result",
-    "verify_prerequisites",
+    "verify_prerequisites", "with_pull_request_merge_base",
 ]

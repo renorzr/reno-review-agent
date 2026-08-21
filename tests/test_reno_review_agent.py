@@ -694,6 +694,22 @@ class SweepResultTests(unittest.TestCase):
         )
         self.assertEqual(files, ("a.py", "b.py"))
 
+    def test_review_uses_merge_base_not_current_target_branch_tip(self) -> None:
+        merge_base = "3" * 40
+
+        class MergeBaseRunner:
+            def run(self, args, *, cwd=None, input_text=None, timeout=None):
+                self.args = args
+                return subprocess.CompletedProcess(args, 0, f"{merge_base}\n", "")
+
+        pull_request = make_pr()
+        reviewed = agent.with_pull_request_merge_base(
+            MergeBaseRunner(), worktree=Path("/tmp/worktree"), pull_request=pull_request
+        )
+
+        self.assertEqual(reviewed.base_sha, merge_base)
+        self.assertEqual(reviewed.head_sha, HEAD_SHA)
+
 
 class ReviewPresentationTests(unittest.TestCase):
     def test_prompt_and_comment_are_sha_scoped(self) -> None:

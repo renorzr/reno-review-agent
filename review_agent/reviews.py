@@ -23,6 +23,7 @@ from typing import Any
 
 from .core import *
 from .models import *
+from .models import _validate_sha
 
 def _coverage_area_text() -> str:
     return "\n".join(f"  - {area}" for area in COVERAGE_AREAS)
@@ -44,12 +45,12 @@ Review this exact pull request revision:
 - Repository: {pull_request.repo_full_name}
 - PR number: {pull_request.number}
 - Base ref: {pull_request.base_ref}
-- Base SHA: {pull_request.base_sha}
+- Merge-base SHA: {pull_request.base_sha}
 - Head SHA: {pull_request.head_sha}
 - PR body SHA-256: {pull_request.body_sha256}
 
 The checkout at your current working directory is detached at the exact head SHA. Review the
-complete base..head diff, not only the latest commit. Judge whether the change delivers the
+complete merge-base..head diff, not only the latest commit. Judge whether the change delivers the
 intended workflow reliably within the repository's stated scope.
 
 Additional review context configured for this agent:
@@ -658,6 +659,32 @@ def changed_files_for_pull_request(
     return changed_files
 
 
+def with_pull_request_merge_base(
+    runner: CommandRunner,
+    *,
+    worktree: Path,
+    pull_request: PullRequest,
+) -> PullRequest:
+    """Pin the review diff to the actual merge base of the fetched PR revision.
+
+    ``PullRequest.base_sha`` is the live target-branch tip while a revision is
+    being prepared, so it can detect base-branch movement. Once checkout has
+    succeeded, Codex must instead receive the merge base: a target branch can
+    legitimately advance after a PR branch was created.
+    """
+    completed = runner.run(
+        ["git", "merge-base", pull_request.base_sha, pull_request.head_sha],
+        cwd=worktree,
+    )
+    try:
+        merge_base = _validate_sha(completed.stdout.strip(), "merge base SHA")
+    except AgentError as exc:
+        raise AgentError(
+            f"cannot determine merge base for {pull_request.key}"
+        ) from exc
+    return dataclasses.replace(pull_request, base_sha=merge_base)
+
+
 def run_codex_review(
     runner: CommandRunner,
     *,
@@ -670,20 +697,25 @@ def run_codex_review(
     review_context: str = DEFAULT_REVIEW_CONTEXT,
     bypass_sandbox: bool = False,
 ) -> ReviewResult:
-    changed_files = changed_files_for_pull_request(
+    review_pull_request = with_pull_request_merge_base(
         runner, worktree=worktree, pull_request=pull_request
+    )
+    changed_files = changed_files_for_pull_request(
+        runner, worktree=worktree, pull_request=review_pull_request
     )
     return _run_product_review(
         runner,
         codex_bin=codex_bin,
         session_id=session_id,
         worktree=worktree,
-        expected_head_sha=pull_request.head_sha,
+        expected_head_sha=review_pull_request.head_sha,
         required_files=changed_files,
-        primary_prompt=build_review_prompt(pull_request, changed_files, review_context),
+        primary_prompt=build_review_prompt(
+            review_pull_request, changed_files, review_context
+        ),
         state_dir=state_dir,
         primary_timeout=timeout,
-        review_label=pull_request.key,
+        review_label=review_pull_request.key,
         bypass_sandbox=bypass_sandbox,
     )
 
